@@ -16,7 +16,7 @@ unsafe impl<'a> Sync for Signed<'a> {}
 
 /// This trait represents a contract between type A<'a>, and type A<'b>,
 /// such that a constant Seal<A<'b>> can be created from A<'a>.
-/// 
+///
 /// This trait is marked unsafe, because both lifetimes 'a and 'b must be invariant.
 pub unsafe trait Contract<'a> {
     /// A new Signed type

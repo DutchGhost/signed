@@ -5,8 +5,8 @@ use core::{
 };
 
 use super::{
-    proof::{NonEmpty},
-    seal::{Seal, Contract},
+    proof::{NonEmpty, Unknown},
+    seal::{Contract, Seal},
 };
 
 #[allow(unused)]
@@ -40,6 +40,13 @@ impl<C: for<'s> Contract<'s>, P> Index<C, P> {
     }
 }
 
+impl<C: for<'s> Contract<'s>> Index<C, NonEmpty> {
+    /// Returns the index directly after.
+    #[inline(always)]
+    pub fn after(&self) -> Index<C, Unknown> {
+        unsafe { Index::new(self.index + 1) }
+    }
+}
 impl<C: for<'s> Contract<'s>, P> Copy for Index<C, P> {}
 impl<C: for<'s> Contract<'s>, P> Clone for Index<C, P> {
     fn clone(&self) -> Self {

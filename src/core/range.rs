@@ -6,7 +6,7 @@ use core::{
 use super::{
     index::Index,
     proof::{NonEmpty, Unknown},
-    seal::{Seal, Contract},
+    seal::{Contract, Seal},
 };
 
 /// This struct is range within a container.

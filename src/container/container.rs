@@ -5,15 +5,16 @@ use super::traits::{
 
 use crate::core::{
     index::Index,
+    proof::NonEmpty,
     range::Range,
-    seal::{Seal, Contract},
+    seal::{Contract, Seal},
 };
 
 /// A container is a generic container over type C.
 /// it also carries a Signed-Contract SC with it,
 /// which it uses to sign contracts between the container,
 /// and a range / index.
-/// 
+///
 /// This contract is unique, and is the core trough which
 /// this container can be accessed without boundschecks.
 #[allow(unused)]
@@ -33,6 +34,11 @@ where
             seal: Seal::new(),
             container,
         }
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns the length of the container.
@@ -55,7 +61,7 @@ where
         unsafe {
             (
                 Range::from(0, index.integer()),
-                Range::from_any(index.integer(), self.len())
+                Range::from_any(index.integer(), self.len()),
             )
         }
     }
@@ -76,12 +82,81 @@ where
             ptr::swap(pa, pb);
         }
     }
+
+    /// Scans the range after `index`, in order from the lower indices towards the higher.
+    /// While the closure returns `true`, the scan continue's, and the scanned element is included in the range.
+    ///
+    /// The resulting range always includes `index` in the range.
+    #[inline(always)]
+    pub fn scan_from<'b, F>(&'b self, index: Index<SC>, mut f: F) -> Range<SC, NonEmpty>
+    where
+        F: FnMut(&'b T) -> bool,
+        T: 'b,
+        C: Contiguous<Item = T>,
+    {
+        let mut end = index.integer();
+
+        for item in &self[index.after()..] {
+            if !f(item) {
+                break;
+            }
+
+            end += 1;
+        }
+
+        end += 1;
+
+        unsafe { Range::from_ne(index.integer(), end) }
+    }
+
+    /// Scans the range before `index, in order from the higher indices towards the lower.
+    /// While the closure returns `true`, the scan continue's, and the scanned element is included in the range.
+    ///
+    /// The resulting range always includes `index` in the range.
+    #[inline(always)]
+    pub fn scan_from_rev<'b, F>(&'b self, index: Index<SC>, mut f: F) -> Range<SC, NonEmpty>
+    where
+        F: FnMut(&'b T) -> bool,
+        T: 'b,
+        C: Contiguous<Item = T>,
+    {
+        unsafe {
+            let mut start = index.integer();
+
+            for item in self[..index].iter().rev() {
+                if !f(item) {
+                    break;
+                }
+
+                start -= 1;
+            }
+
+            Range::from_ne(start, index.integer() + 1)
+        }
+    }
 }
 
-impl<SC: for<'s> Contract<'s>, C> Container<SC, C>
+impl<SC: for<'s> Contract<'s>, C, T> Container<SC, C>
 where
-    C: SplitUnchecked,
+    C: SplitUnchecked<Item = T>,
 {
+    #[inline(always)]
+    pub fn split_first(&self) -> Option<(&T, Container<impl for<'s> Contract<'s>, &[T]>)>
+    where
+        C: GetUnchecked,
+    {
+        self.range().nonempty().map(|range| {
+            let index = range.first();
+            (
+                &self[index],
+                Container {
+                    seal: <SC as Contract<'_>>::SEALED,
+                    container: &self[index.after()..],
+                },
+            )
+        })
+    }
+
     /// Divides one container into two at `index`.
     /// The first will contain all indices from `[0, index)` and the second will contain all indices from
     /// [mid, len).
@@ -110,10 +185,33 @@ where
     }
 }
 
-impl<SC: for<'s> Contract<'s>, C> Container<SC, C>
+impl<SC: for<'s> Contract<'s>, C, T> Container<SC, C>
 where
-    C: SplitUncheckedMut,
+    C: SplitUncheckedMut<Item = T>,
 {
+    #[inline(always)]
+    pub fn split_first_mut(
+        &mut self,
+    ) -> Option<(&mut T, Container<impl for<'s> Contract<'s>, &mut [T]>)>
+    where
+        C: SplitUnchecked<Split = [T]>,
+    {
+        unsafe {
+            if !self.is_empty() {
+                let split = self.container.split_unchecked_mut(1);
+
+                Some((
+                    split.0.unchecked_mut(0),
+                    Container {
+                        seal: <SC as Contract<'_>>::SEALED,
+                        container: split.1,
+                    },
+                ))
+            } else {
+                None
+            }
+        }
+    }
     /// Divides one mutable container into two at `index`.
     /// The first will contain all indices from `[0, index)` and the second will contain all indices from
     /// [mid, len).
@@ -144,6 +242,7 @@ where
 
 use core::ops;
 
+/// &self[i]
 impl<SC: for<'s> Contract<'s>, C> ops::Index<Index<SC>> for Container<SC, C>
 where
     C: GetUnchecked,
@@ -156,6 +255,7 @@ where
     }
 }
 
+/// &mut self[i]
 impl<SC: for<'s> Contract<'s>, C> ops::IndexMut<Index<SC>> for Container<SC, C>
 where
     C: GetUncheckedMut,
@@ -166,8 +266,8 @@ where
     }
 }
 
-impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<Range<SC, P>>
-    for Container<SC, C>
+/// &self[r]
+impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<Range<SC, P>> for Container<SC, C>
 where
     C: Contiguous<Item = T>,
 {
@@ -181,8 +281,8 @@ where
     }
 }
 
-impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<Range<SC, P>>
-    for Container<SC, C>
+/// &mut self[r]
+impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<Range<SC, P>> for Container<SC, C>
 where
     C: ContiguousMut,
 {
@@ -191,7 +291,104 @@ where
         use core::slice;
 
         unsafe {
-            slice::from_raw_parts_mut(self.container.begin_mut().offset(r.start() as isize), r.len())
+            slice::from_raw_parts_mut(
+                self.container.begin_mut().offset(r.start() as isize),
+                r.len(),
+            )
         }
+    }
+}
+
+/// &self[i..]
+impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<ops::RangeFrom<Index<SC, P>>>
+    for Container<SC, C>
+where
+    C: Contiguous<Item = T>,
+{
+    type Output = [T];
+
+    #[inline(always)]
+    fn index(&self, r: ops::RangeFrom<Index<SC, P>>) -> &Self::Output {
+        use core::slice;
+
+        let i = r.start.integer();
+
+        unsafe { slice::from_raw_parts(self.container.begin().offset(i as isize), self.len() - i) }
+    }
+}
+
+///&mut self[i..]
+impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<ops::RangeFrom<Index<SC, P>>>
+    for Container<SC, C>
+where
+    C: ContiguousMut,
+{
+    #[inline(always)]
+    fn index_mut(&mut self, r: ops::RangeFrom<Index<SC, P>>) -> &mut Self::Output {
+        use core::slice;
+
+        let i = r.start.integer();
+
+        unsafe {
+            slice::from_raw_parts_mut(
+                self.container.begin_mut().offset(i as isize),
+                self.len() - i,
+            )
+        }
+    }
+}
+
+/// &self[..i]
+impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<ops::RangeTo<Index<SC, P>>> for Container<SC, C>
+where
+    C: Contiguous<Item = T>,
+{
+    type Output = [T];
+
+    #[inline(always)]
+    fn index(&self, r: ops::RangeTo<Index<SC, P>>) -> &Self::Output {
+        use core::slice;
+
+        let i = r.end.integer();
+
+        unsafe { slice::from_raw_parts(self.container.begin(), i) }
+    }
+}
+
+///&mut self[i..]
+impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<ops::RangeTo<Index<SC, P>>> for Container<SC, C>
+where
+    C: ContiguousMut,
+{
+    #[inline(always)]
+    fn index_mut(&mut self, r: ops::RangeTo<Index<SC, P>>) -> &mut Self::Output {
+        use core::slice;
+
+        let i = r.end.integer();
+
+        unsafe { slice::from_raw_parts_mut(self.container.begin_mut(), i) }
+    }
+}
+
+/// &self[..]
+impl<SC: for<'s> Contract<'s>, C, T> ops::Index<ops::RangeFull> for Container<SC, C>
+where
+    C: Contiguous<Item = T>,
+{
+    type Output = [T];
+
+    #[inline(always)]
+    fn index(&self, _: ops::RangeFull) -> &Self::Output {
+        self.container.as_slice()
+    }
+}
+
+/// &mut self[..]
+impl<SC: for<'s> Contract<'s>, C> ops::IndexMut<ops::RangeFull> for Container<SC, C>
+where
+    C: ContiguousMut,
+{
+    fn index_mut(&mut self, _: ops::RangeFull) -> &mut Self::Output {
+        self.container.as_mut_slice()
     }
 }
