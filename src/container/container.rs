@@ -141,20 +141,27 @@ where
     C: SplitUnchecked<Item = T>,
 {
     #[inline(always)]
-    pub fn split_first(&self) -> Option<(&T, Container<impl for<'s> Contract<'s>, &[T]>)>
+    pub fn split_first(
+        &self,
+    ) -> Option<(
+        &T,
+        Container<impl for<'s> Contract<'s>, &<C as SplitUnchecked>::Split>,
+    )>
     where
-        C: GetUnchecked,
+        <C as SplitUnchecked>::Split: GetUnchecked<Item = T>,
     {
-        self.range().nonempty().map(|range| {
-            let index = range.first();
-            (
-                &self[index],
-                Container {
-                    seal: <SC as Contract<'_>>::SEALED,
-                    container: &self[index.after()..],
-                },
-            )
-        })
+        // The bound on <C as SplitUnchecked>::Split allows the `unchecked(0)` call.
+        unsafe {
+            if !self.is_empty() {
+                let split = self.split_at(Index::new(1));
+
+                let (lhs, rhs) = split;
+
+                Some((lhs.container.unchecked(0), rhs))
+            } else {
+                None
+            }
+        }
     }
 
     /// Divides one container into two at `index`.
@@ -192,21 +199,21 @@ where
     #[inline(always)]
     pub fn split_first_mut(
         &mut self,
-    ) -> Option<(&mut T, Container<impl for<'s> Contract<'s>, &mut [T]>)>
+    ) -> Option<(
+        &mut T,
+        Container<impl for<'s> Contract<'s>, &mut <C as SplitUnchecked>::Split>,
+    )>
     where
-        C: SplitUnchecked<Split = [T]>,
+        <C as SplitUnchecked>::Split: GetUncheckedMut<Item = T>,
     {
+        // The bound on <C as SplitUnchecked>::Split allows the `unchecked_mut(0)` call.
         unsafe {
             if !self.is_empty() {
-                let split = self.container.split_unchecked_mut(1);
+                let split = self.split_at_mut(Index::new(1));
 
-                Some((
-                    split.0.unchecked_mut(0),
-                    Container {
-                        seal: <SC as Contract<'_>>::SEALED,
-                        container: split.1,
-                    },
-                ))
+                let (lhs, rhs) = split;
+
+                Some((lhs.container.unchecked_mut(0), rhs))
             } else {
                 None
             }

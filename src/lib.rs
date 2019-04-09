@@ -46,7 +46,7 @@ mod tests {
     fn test_scan_from() {
         let mut v = vec![1, 2, 3, 4, 5, 6, 7];
 
-        region(v.as_mut_slice(), |s| {
+        region(v.as_mut_slice(), |mut s| {
             if let Some(r) = s.range().nonempty() {
                 let mid = r.upper_middle();
                 assert_eq!(mid.integer(), 3);
@@ -54,6 +54,52 @@ mod tests {
 
                 assert_eq!(s[scanned_range], [4]);
             }
+        })
+    }
+
+    #[test]
+    fn test_split_first() {
+        let mut v = vec![1, 2, 3, 4, 5, 6, 7];
+
+        region(v.as_mut_slice(), |mut s| {
+            let (first, rest) = s.split_first().unwrap();
+
+            assert_eq!(first, &1);
+            assert_eq!(rest[..], [2, 3, 4, 5, 6, 7]);
+
+            let (first, rest) = s.split_first_mut().unwrap();
+
+            assert_eq!(first, &mut 1);
+            assert_eq!(rest[..], [2, 3, 4, 5, 6, 7]);
+        })
+    }
+
+    #[test]
+    fn test_split_first_size_is_1() {
+        let mut v = vec![1];
+
+        region(v.as_mut_slice(), |mut s| {
+            let (first, rest) = s.split_first().unwrap();
+
+            assert_eq!(first, &1);
+            assert_eq!(rest[..], []);
+            assert!(rest.range().nonempty().is_none());
+
+            let (first, rest) = s.split_first_mut().unwrap();
+
+            assert_eq!(first, &mut 1);
+            assert_eq!(rest[..], []);
+            assert!(rest.range().nonempty().is_none());
+        })
+    }
+
+    #[test]
+    fn test_split_first_size_is_0() {
+        let mut v: Vec<usize> = vec![];
+
+        region(v.as_mut_slice(), |mut s| {
+            assert!(s.split_first().is_none());
+            assert!(s.split_first_mut().is_none());
         })
     }
 }
