@@ -3,12 +3,12 @@ pub mod container;
 pub mod core;
 
 use crate::core::seal::Signed;
-use container::{container::{Get, Container}, traits::ContainerTrait};
+use container::{container::Container, traits::ContainerTrait};
 
 pub fn region<C, F, Out>(container: C, f: F) -> Out
 where
     F: for<'id> FnOnce(Container<Signed<'id>, C>) -> Out,
-    C: ContainerTrait
+    C: ContainerTrait,
 {
     f(Container::new(container))
 }
@@ -102,19 +102,5 @@ mod tests {
             assert!(s.split_first().is_none());
             assert!(s.split_first_mut().is_none());
         })
-    }
-
-    #[test]
-    fn return_reference() {
-        let mut a = [1, 2, 3, 4];
-
-        let reference: &i32 = region(a.as_ref(), |s| {
-            let range = s.range().nonempty().unwrap();
-            s.get(range.first())
-        });
-
-        assert_eq!(reference, &1);
-
-        let b = a;
     }
 }

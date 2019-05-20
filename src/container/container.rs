@@ -23,6 +23,18 @@ pub struct Container<C: for<'s> Contract<'s>, A> {
     container: A,
 }
 
+impl<C: for<'s> Contract<'s>, A: Copy> Copy for Container<C, A> {}
+
+impl<C: for<'s> Contract<'s>, A: Clone> Clone for Container<C, A> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            seal: Seal::new(),
+            container: self.container.clone(),
+        }
+    }
+}
+
 impl<C: for<'s> Contract<'s>, A, T> Container<C, A>
 where
     A: ContainerTrait<Item = T>,
@@ -247,32 +259,6 @@ where
     }
 }
 
-pub trait Get<'a, Index> {
-    type Item: ?Sized;
-
-    fn get(&self, index: Index) -> &'a Self::Item;
-}
-
-
-impl <'a, C: for<'s> Contract<'s>, P, T> Get<'a, Index<C, P>> for Container<C, &'a [T]>
-where
-{
-    type Item = T;
-
-    fn get(&self, index: Index<C, P>) -> &'a Self::Item
-    {
-        unsafe { self.container.unchecked(index.integer()) }
-    }
-}
-
-impl <'a, C: for<'s> Contract<'s>, P, T> Get<'a, Range<C, P>> for Container<C, &'a [T]> {
-    type Item = [T];
-
-    fn get(&self, index: Range<C, P>) -> &'a Self::Item {
-        unsafe { self.container.get_unchecked(index.start()..index.end())}
-    }
-}
-
 use core::ops;
 
 /// &self[i]
@@ -333,8 +319,7 @@ where
 }
 
 /// &self[i..]
-impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<ops::RangeFrom<Index<C, P>>>
-    for Container<C, A>
+impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<ops::RangeFrom<Index<C, P>>> for Container<C, A>
 where
     A: Contiguous<Item = T>,
 {
@@ -351,8 +336,7 @@ where
 }
 
 ///&mut self[i..]
-impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<ops::RangeFrom<Index<C, P>>>
-    for Container<C, A>
+impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<ops::RangeFrom<Index<C, P>>> for Container<C, A>
 where
     A: ContiguousMut,
 {
