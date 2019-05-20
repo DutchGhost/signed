@@ -33,6 +33,18 @@ unsafe impl<'a, 'b> Contract<'b> for Signed<'a> {
     const SEALED: Seal<Self::With> = Seal(PhantomData);
 }
 
+unsafe impl <'a, 'b, C: ?Sized + Contract<'b>> Contract<'b> for &'a C {
+    type With = C::With;
+
+    const SEALED: Seal<Self::With> = C::SEALED;
+}
+
+unsafe impl <'a, 'b, C: ?Sized + Contract<'b>> Contract<'b> for &'a mut C {
+    type With = C::With;
+
+    const SEALED: Seal<Self::With> = C::SEALED;
+}
+
 /// A seal over any contract `C`.
 pub struct Seal<C: for<'s> Contract<'s>>(PhantomData<C>);
 

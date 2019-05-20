@@ -10,26 +10,26 @@ use crate::core::{
     seal::{Contract, Seal},
 };
 
-/// A container is a generic container over type C.
-/// it also carries a Signed-Contract SC with it,
+/// A container is a generic container over type A (array).
+/// it also carries a Contract (C) with it,
 /// which it uses to sign contracts between the container,
 /// and a range / index.
 ///
 /// This contract is unique, and is the core trough which
 /// this container can be accessed without boundschecks.
 #[allow(unused)]
-pub struct Container<SC: for<'s> Contract<'s>, C> {
-    seal: Seal<SC>,
-    container: C,
+pub struct Container<C: for<'s> Contract<'s>, A> {
+    seal: Seal<C>,
+    container: A,
 }
 
-impl<SC: for<'s> Contract<'s>, C, T> Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T> Container<C, A>
 where
-    C: ContainerTrait<Item = T>,
+    A: ContainerTrait<Item = T>,
 {
     /// Creates a new container from `C`.
     #[inline(always)]
-    pub(crate) fn new(container: C) -> Self {
+    pub(crate) fn new(container: A) -> Self {
         Self {
             seal: Seal::new(),
             container,
@@ -49,7 +49,7 @@ where
 
     /// Returns a range into the container.
     #[inline(always)]
-    pub fn range(&self) -> Range<SC> {
+    pub fn range(&self) -> Range<C> {
         unsafe { Range::from(0, self.len()) }
     }
 
@@ -57,7 +57,7 @@ where
     /// one from `0..index`, the other from `index..self.len()`.
     /// Proof `P` of the length transfers to the latter end.
     #[inline(always)]
-    pub fn split_at_index<P>(&self, index: Index<SC, P>) -> (Range<SC>, Range<SC, P>) {
+    pub fn split_at_index<P>(&self, index: Index<C, P>) -> (Range<C>, Range<C, P>) {
         unsafe {
             (
                 Range::from(0, index.integer()),
@@ -68,9 +68,9 @@ where
 
     /// Swaps the element at index `a` with the element at index `b`.
     #[inline(always)]
-    pub fn swap(&mut self, a: Index<SC>, b: Index<SC>)
+    pub fn swap(&mut self, a: Index<C>, b: Index<C>)
     where
-        C: GetUncheckedMut,
+        A: GetUncheckedMut,
     {
         use core::ptr;
 
@@ -88,11 +88,11 @@ where
     ///
     /// The resulting range always includes `index` in the range.
     #[inline(always)]
-    pub fn scan_from<'b, F>(&'b self, index: Index<SC>, mut f: F) -> Range<SC, NonEmpty>
+    pub fn scan_from<'b, F>(&'b self, index: Index<C>, mut f: F) -> Range<C, NonEmpty>
     where
         F: FnMut(&'b T) -> bool,
         T: 'b,
-        C: Contiguous<Item = T>,
+        A: Contiguous<Item = T>,
     {
         let mut end = index.integer();
 
@@ -114,11 +114,11 @@ where
     ///
     /// The resulting range always includes `index` in the range.
     #[inline(always)]
-    pub fn scan_from_rev<'b, F>(&'b self, index: Index<SC>, mut f: F) -> Range<SC, NonEmpty>
+    pub fn scan_from_rev<'b, F>(&'b self, index: Index<C>, mut f: F) -> Range<C, NonEmpty>
     where
         F: FnMut(&'b T) -> bool,
         T: 'b,
-        C: Contiguous<Item = T>,
+        A: Contiguous<Item = T>,
     {
         unsafe {
             let mut start = index.integer();
@@ -136,19 +136,19 @@ where
     }
 }
 
-impl<SC: for<'s> Contract<'s>, C, T> Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T> Container<C, A>
 where
-    C: SplitUnchecked<Item = T>,
+    A: SplitUnchecked<Item = T>,
 {
     #[inline(always)]
     pub fn split_first(
         &self,
     ) -> Option<(
         &T,
-        Container<impl for<'s> Contract<'s>, &<C as SplitUnchecked>::Split>,
+        Container<impl for<'s> Contract<'s>, &<A as SplitUnchecked>::Split>,
     )>
     where
-        <C as SplitUnchecked>::Split: GetUnchecked<Item = T>,
+        <A as SplitUnchecked>::Split: GetUnchecked<Item = T>,
     {
         // The bound on <C as SplitUnchecked>::Split allows the `unchecked(0)` call.
         unsafe {
@@ -170,21 +170,21 @@ where
     #[inline(always)]
     pub fn split_at(
         &self,
-        index: Index<SC>,
+        index: Index<C>,
     ) -> (
-        Container<impl for<'s> Contract<'s>, &<C as SplitUnchecked>::Split>,
-        Container<impl for<'s> Contract<'s>, &<C as SplitUnchecked>::Split>,
+        Container<impl for<'s> Contract<'s>, &<A as SplitUnchecked>::Split>,
+        Container<impl for<'s> Contract<'s>, &<A as SplitUnchecked>::Split>,
     ) {
         unsafe {
             let (lhs, rhs) = self.container.split_unchecked(index.integer());
 
             (
                 Container {
-                    seal: <SC as Contract<'_>>::SEALED,
+                    seal: <C as Contract<'_>>::SEALED,
                     container: lhs,
                 },
                 Container {
-                    seal: <SC as Contract<'_>>::SEALED,
+                    seal: <C as Contract<'_>>::SEALED,
                     container: rhs,
                 },
             )
@@ -192,19 +192,19 @@ where
     }
 }
 
-impl<SC: for<'s> Contract<'s>, C, T> Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T> Container<C, A>
 where
-    C: SplitUncheckedMut<Item = T>,
+    A: SplitUncheckedMut<Item = T>,
 {
     #[inline(always)]
     pub fn split_first_mut(
         &mut self,
     ) -> Option<(
         &mut T,
-        Container<impl for<'s> Contract<'s>, &mut <C as SplitUnchecked>::Split>,
+        Container<impl for<'s> Contract<'s>, &mut <A as SplitUnchecked>::Split>,
     )>
     where
-        <C as SplitUnchecked>::Split: GetUncheckedMut<Item = T>,
+        <A as SplitUnchecked>::Split: GetUncheckedMut<Item = T>,
     {
         // The bound on <C as SplitUnchecked>::Split allows the `unchecked_mut(0)` call.
         unsafe {
@@ -225,21 +225,21 @@ where
     #[inline(always)]
     pub fn split_at_mut(
         &mut self,
-        index: Index<SC>,
+        index: Index<C>,
     ) -> (
-        Container<impl for<'s> Contract<'s>, &mut <C as SplitUnchecked>::Split>,
-        Container<impl for<'s> Contract<'s>, &mut <C as SplitUnchecked>::Split>,
+        Container<impl for<'s> Contract<'s>, &mut <A as SplitUnchecked>::Split>,
+        Container<impl for<'s> Contract<'s>, &mut <A as SplitUnchecked>::Split>,
     ) {
         unsafe {
             let (lhs, rhs) = self.container.split_unchecked_mut(index.integer());
 
             (
                 Container {
-                    seal: <SC as Contract<'_>>::SEALED,
+                    seal: <C as Contract<'_>>::SEALED,
                     container: lhs,
                 },
                 Container {
-                    seal: <SC as Contract<'_>>::SEALED,
+                    seal: <C as Contract<'_>>::SEALED,
                     container: rhs,
                 },
             )
@@ -247,41 +247,67 @@ where
     }
 }
 
+pub trait Get<'a, Index> {
+    type Item: ?Sized;
+
+    fn get(&self, index: Index) -> &'a Self::Item;
+}
+
+
+impl <'a, C: for<'s> Contract<'s>, P, T> Get<'a, Index<C, P>> for Container<C, &'a [T]>
+where
+{
+    type Item = T;
+
+    fn get(&self, index: Index<C, P>) -> &'a Self::Item
+    {
+        unsafe { self.container.unchecked(index.integer()) }
+    }
+}
+
+impl <'a, C: for<'s> Contract<'s>, P, T> Get<'a, Range<C, P>> for Container<C, &'a [T]> {
+    type Item = [T];
+
+    fn get(&self, index: Range<C, P>) -> &'a Self::Item {
+        unsafe { self.container.get_unchecked(index.start()..index.end())}
+    }
+}
+
 use core::ops;
 
 /// &self[i]
-impl<SC: for<'s> Contract<'s>, C> ops::Index<Index<SC>> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A> ops::Index<Index<C>> for Container<C, A>
 where
-    C: GetUnchecked,
+    A: GetUnchecked,
 {
-    type Output = C::Item;
+    type Output = A::Item;
 
     #[inline(always)]
-    fn index(&self, index: Index<SC>) -> &Self::Output {
+    fn index(&self, index: Index<C>) -> &Self::Output {
         unsafe { self.container.unchecked(index.integer()) }
     }
 }
 
 /// &mut self[i]
-impl<SC: for<'s> Contract<'s>, C> ops::IndexMut<Index<SC>> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A> ops::IndexMut<Index<C>> for Container<C, A>
 where
-    C: GetUncheckedMut,
+    A: GetUncheckedMut,
 {
     #[inline(always)]
-    fn index_mut(&mut self, index: Index<SC>) -> &mut Self::Output {
+    fn index_mut(&mut self, index: Index<C>) -> &mut Self::Output {
         unsafe { self.container.unchecked_mut(index.integer()) }
     }
 }
 
 /// &self[r]
-impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<Range<SC, P>> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<Range<C, P>> for Container<C, A>
 where
-    C: Contiguous<Item = T>,
+    A: Contiguous<Item = T>,
 {
     type Output = [T];
 
     #[inline(always)]
-    fn index(&self, r: Range<SC, P>) -> &Self::Output {
+    fn index(&self, r: Range<C, P>) -> &Self::Output {
         use core::slice;
 
         unsafe { slice::from_raw_parts(self.container.begin().offset(r.start() as isize), r.len()) }
@@ -289,12 +315,12 @@ where
 }
 
 /// &mut self[r]
-impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<Range<SC, P>> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<Range<C, P>> for Container<C, A>
 where
-    C: ContiguousMut,
+    A: ContiguousMut,
 {
     #[inline(always)]
-    fn index_mut(&mut self, r: Range<SC, P>) -> &mut Self::Output {
+    fn index_mut(&mut self, r: Range<C, P>) -> &mut Self::Output {
         use core::slice;
 
         unsafe {
@@ -307,15 +333,15 @@ where
 }
 
 /// &self[i..]
-impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<ops::RangeFrom<Index<SC, P>>>
-    for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<ops::RangeFrom<Index<C, P>>>
+    for Container<C, A>
 where
-    C: Contiguous<Item = T>,
+    A: Contiguous<Item = T>,
 {
     type Output = [T];
 
     #[inline(always)]
-    fn index(&self, r: ops::RangeFrom<Index<SC, P>>) -> &Self::Output {
+    fn index(&self, r: ops::RangeFrom<Index<C, P>>) -> &Self::Output {
         use core::slice;
 
         let i = r.start.integer();
@@ -325,13 +351,13 @@ where
 }
 
 ///&mut self[i..]
-impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<ops::RangeFrom<Index<SC, P>>>
-    for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<ops::RangeFrom<Index<C, P>>>
+    for Container<C, A>
 where
-    C: ContiguousMut,
+    A: ContiguousMut,
 {
     #[inline(always)]
-    fn index_mut(&mut self, r: ops::RangeFrom<Index<SC, P>>) -> &mut Self::Output {
+    fn index_mut(&mut self, r: ops::RangeFrom<Index<C, P>>) -> &mut Self::Output {
         use core::slice;
 
         let i = r.start.integer();
@@ -346,14 +372,14 @@ where
 }
 
 /// &self[..i]
-impl<SC: for<'s> Contract<'s>, C, T, P> ops::Index<ops::RangeTo<Index<SC, P>>> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<ops::RangeTo<Index<C, P>>> for Container<C, A>
 where
-    C: Contiguous<Item = T>,
+    A: Contiguous<Item = T>,
 {
     type Output = [T];
 
     #[inline(always)]
-    fn index(&self, r: ops::RangeTo<Index<SC, P>>) -> &Self::Output {
+    fn index(&self, r: ops::RangeTo<Index<C, P>>) -> &Self::Output {
         use core::slice;
 
         let i = r.end.integer();
@@ -363,12 +389,12 @@ where
 }
 
 ///&mut self[i..]
-impl<SC: for<'s> Contract<'s>, C, P> ops::IndexMut<ops::RangeTo<Index<SC, P>>> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<ops::RangeTo<Index<C, P>>> for Container<C, A>
 where
-    C: ContiguousMut,
+    A: ContiguousMut,
 {
     #[inline(always)]
-    fn index_mut(&mut self, r: ops::RangeTo<Index<SC, P>>) -> &mut Self::Output {
+    fn index_mut(&mut self, r: ops::RangeTo<Index<C, P>>) -> &mut Self::Output {
         use core::slice;
 
         let i = r.end.integer();
@@ -378,9 +404,9 @@ where
 }
 
 /// &self[..]
-impl<SC: for<'s> Contract<'s>, C, T> ops::Index<ops::RangeFull> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A, T> ops::Index<ops::RangeFull> for Container<C, A>
 where
-    C: Contiguous<Item = T>,
+    A: Contiguous<Item = T>,
 {
     type Output = [T];
 
@@ -391,9 +417,9 @@ where
 }
 
 /// &mut self[..]
-impl<SC: for<'s> Contract<'s>, C> ops::IndexMut<ops::RangeFull> for Container<SC, C>
+impl<C: for<'s> Contract<'s>, A> ops::IndexMut<ops::RangeFull> for Container<C, A>
 where
-    C: ContiguousMut,
+    A: ContiguousMut,
 {
     fn index_mut(&mut self, _: ops::RangeFull) -> &mut Self::Output {
         self.container.as_mut_slice()
