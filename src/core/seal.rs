@@ -30,22 +30,21 @@ impl<'a> Signed<'a> {
 unsafe impl<'a> Send for Signed<'a> {}
 unsafe impl<'a> Sync for Signed<'a> {}
 
-/// This trait represents a contract between type A<'a>, and type A<'b>,
-/// such that a constant Seal<A<'b>> can be created from A<'a>.
+/// This trait represents a contract between type `A<'a>`, and type `A<'b>`,
+/// such that a `Seal<A<'b>>` can be derived from `A<'a>`.
 ///
 /// This trait is marked unsafe, because both lifetimes 'a and 'b must be invariant.
 pub unsafe trait Contract<'a> {
     /// A new Signed type
     type With: for<'s> Contract<'s>;
 
-    /// Const construction of Self::Signed
+    /// Const construction of a [`Seal`] wrapping [`Contract::With`].
     const SEALED: Seal<Self::With>;
 }
 
 unsafe impl<'a, 'b> Contract<'b> for Signed<'a> {
     type With = Signed<'b>;
 
-    /// Const construction of Seal<Self::With>
     const SEALED: Seal<Self::With> = Seal(PhantomData);
 }
 

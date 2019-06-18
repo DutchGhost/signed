@@ -9,13 +9,20 @@ use super::{
     seal::{Contract, Seal},
 };
 
-/// This struct is range within a container.
-/// It has 2 parameters, C and P.
-/// C stands for Contract, which is a contract handed out by
-/// a container.
-/// P stands for Proof, which is a Proof over the length of the range.
-/// an Unknown proof can be any range,
-/// a NonEmpty proof is guaranteed to be NonEmpty (at least contains 1 element).
+// Due to doc issue's, we import this.
+#[allow(unused)]
+use crate::container::Container;
+
+/// This struct is range within a [`Container`].
+/// It is paremeterized with a [`Contract`] `C`, to
+/// guarantee uniqueness of this range, and a `Proof` `P`, which
+/// is used to statically guarantee whether this range is [`NonEmpty`], or [`Unknown`].
+///
+/// An [`Unknown`] proof can be any range, thus also an empty range,
+/// while a [`NonEmpty`] proof is guaranteed to have at least 1 element in the range.
+///
+/// This struct has no constructor, instead use the [`Container::range`] method
+/// to obtain a range within the container.
 #[allow(unused)]
 pub struct Range<C: for<'s> Contract<'s>, P = Unknown> {
     start: usize,
@@ -26,10 +33,12 @@ pub struct Range<C: for<'s> Contract<'s>, P = Unknown> {
 
 impl<C: for<'s> Contract<'s>> Range<C> {
     /// Creates a new Unknow range from `start` to `end`.
+    ///
+    /// # Unsafe
     /// This function is marked unsafe,
     /// because it can not be proved `start` and `end` make up a valid range.
     #[inline(always)]
-    pub unsafe fn from(start: usize, end: usize) -> Range<C> {
+    pub(crate) unsafe fn from_unknown(start: usize, end: usize) -> Range<C> {
         Range {
             start,
             end,
@@ -44,7 +53,7 @@ impl<C: for<'s> Contract<'s>> Range<C, NonEmpty> {
     /// This function is marked unsafe,
     /// because it can not be proved `start` and `end` make up a valid range.
     #[inline(always)]
-    pub unsafe fn from_ne(start: usize, end: usize) -> Range<C, NonEmpty> {
+    pub(crate) unsafe fn from_nonempty(start: usize, end: usize) -> Range<C, NonEmpty> {
         Range {
             start,
             end,
@@ -59,7 +68,7 @@ impl<C: for<'s> Contract<'s>, P> Range<C, P> {
     /// This function is marked unsafe,
     /// because it can not be proved `start` and `end` make up a valid range.
     #[inline(always)]
-    pub unsafe fn from_any(start: usize, end: usize) -> Range<C, P> {
+    pub(crate) unsafe fn from_any(start: usize, end: usize) -> Range<C, P> {
         Range {
             start,
             end,
@@ -99,7 +108,7 @@ impl<C: for<'s> Contract<'s>, P> Range<C, P> {
     #[inline(always)]
     pub fn nonempty(&self) -> Option<Range<C, NonEmpty>> {
         if !self.is_empty() {
-            unsafe { Some(core::mem::transmute(*self)) }
+            unsafe { Some(Range::from_nonempty(self.start(), self.end())) }
         } else {
             None
         }
@@ -150,7 +159,12 @@ impl<C: for<'s> Contract<'s>, P> Range<C, P> {
     pub fn split_in_half(&self) -> (Range<C>, Range<C, P>) {
         let mid = (self.end - self.start) / 2 + self.start;
 
-        unsafe { (Range::from(self.start, mid), Range::from_any(mid, self.end)) }
+        unsafe {
+            (
+                Range::from_unknown(self.start, mid),
+                Range::from_any(mid, self.end),
+            )
+        }
     }
 
     /// Splits the range at `index`.
@@ -159,7 +173,7 @@ impl<C: for<'s> Contract<'s>, P> Range<C, P> {
     pub fn split_index(&self, index: Index<C>) -> (Range<C>, Range<C, P>) {
         unsafe {
             (
-                Range::from(self.start, index.integer()),
+                Range::from_unknown(self.start, index.integer()),
                 Range::from_any(index.integer(), self.end),
             )
         }
@@ -189,14 +203,14 @@ impl<C: for<'s> Contract<'s>> Range<C, NonEmpty> {
     /// such that the start of the new range is incremented by one.
     #[inline(always)]
     pub fn tail(self) -> Range<C> {
-        unsafe { Range::from(self.start + 1, self.end) }
+        unsafe { Range::from_unknown(self.start + 1, self.end) }
     }
 
     /// Returns a new range,
     /// such that the end of the new range is decremented by one.
     #[inline(always)]
     pub fn head(self) -> Range<C> {
-        unsafe { Range::from(self.start, self.end - 1) }
+        unsafe { Range::from_unknown(self.start, self.end - 1) }
     }
 
     /// Advances the range backwards.
@@ -291,5 +305,17 @@ impl<C: for<'s> Contract<'s>> core::iter::ExactSizeIterator for RangeIter<C> {
     #[inline(always)]
     fn len(&self) -> usize {
         self.end - self.start
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Range;
+
+    #[test]
+    fn range_from() {
+        use crate::core::seal::Signed;
+        let range: Range<Signed> = unsafe { Range::from_unknown(0, 10) };
+        assert_eq!(range.len(), 10);
     }
 }

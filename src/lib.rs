@@ -3,7 +3,7 @@ pub mod container;
 pub mod core;
 
 use crate::core::seal::Signed;
-use container::{container::Container, traits::ContainerTrait};
+use container::{traits::ContainerTrait, Container};
 
 pub fn region<C, F, Out>(container: C, f: F) -> Out
 where
@@ -101,6 +101,19 @@ mod tests {
         region(v.as_mut_slice(), |mut s| {
             assert!(s.split_first().is_none());
             assert!(s.split_first_mut().is_none());
+        })
+    }
+
+    #[test]
+    fn test_split_index_into_other() {
+        let mut v = vec![1, 2, 3, 4, 5, 6];
+
+        region(v.as_mut_slice(), |mut s| {
+            if let Some(r) = s.range().nonempty() {
+                let mid = r.upper_middle();
+
+                let (lhs, rhs) = s.split_at_mut(mid);
+            }
         })
     }
 }

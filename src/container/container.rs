@@ -62,7 +62,7 @@ where
     /// Returns a range into the container.
     #[inline(always)]
     pub fn range(&self) -> Range<C> {
-        unsafe { Range::from(0, self.len()) }
+        unsafe { Range::from_unknown(0, self.len()) }
     }
 
     /// Returns 2 ranges into the container,
@@ -72,7 +72,7 @@ where
     pub fn split_at_index<P>(&self, index: Index<C, P>) -> (Range<C>, Range<C, P>) {
         unsafe {
             (
-                Range::from(0, index.integer()),
+                Range::from_unknown(0, index.integer()),
                 Range::from_any(index.integer(), self.len()),
             )
         }
@@ -118,7 +118,7 @@ where
 
         end += 1;
 
-        unsafe { Range::from_ne(index.integer(), end) }
+        unsafe { Range::from_nonempty(index.integer(), end) }
     }
 
     /// Scans the range before `index, in order from the higher indices towards the lower.
@@ -143,7 +143,7 @@ where
                 start -= 1;
             }
 
-            Range::from_ne(start, index.integer() + 1)
+            Range::from_nonempty(start, index.integer() + 1)
         }
     }
 }
@@ -261,7 +261,7 @@ where
 
 use core::ops;
 
-/// &self[i]
+// &self[i]
 impl<C: for<'s> Contract<'s>, A> ops::Index<Index<C>> for Container<C, A>
 where
     A: GetUnchecked,
@@ -274,7 +274,7 @@ where
     }
 }
 
-/// &mut self[i]
+// &mut self[i]
 impl<C: for<'s> Contract<'s>, A> ops::IndexMut<Index<C>> for Container<C, A>
 where
     A: GetUncheckedMut,
@@ -285,7 +285,7 @@ where
     }
 }
 
-/// &self[r]
+// &self[r]
 impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<Range<C, P>> for Container<C, A>
 where
     A: Contiguous<Item = T>,
@@ -300,7 +300,7 @@ where
     }
 }
 
-/// &mut self[r]
+// &mut self[r]
 impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<Range<C, P>> for Container<C, A>
 where
     A: ContiguousMut,
@@ -318,7 +318,7 @@ where
     }
 }
 
-/// &self[i..]
+// &self[i..]
 impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<ops::RangeFrom<Index<C, P>>> for Container<C, A>
 where
     A: Contiguous<Item = T>,
@@ -335,7 +335,7 @@ where
     }
 }
 
-///&mut self[i..]
+// &mut self[i..]
 impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<ops::RangeFrom<Index<C, P>>> for Container<C, A>
 where
     A: ContiguousMut,
@@ -355,7 +355,7 @@ where
     }
 }
 
-/// &self[..i]
+// &self[..i]
 impl<C: for<'s> Contract<'s>, A, T, P> ops::Index<ops::RangeTo<Index<C, P>>> for Container<C, A>
 where
     A: Contiguous<Item = T>,
@@ -372,7 +372,7 @@ where
     }
 }
 
-///&mut self[i..]
+// &mut self[i..]
 impl<C: for<'s> Contract<'s>, A, P> ops::IndexMut<ops::RangeTo<Index<C, P>>> for Container<C, A>
 where
     A: ContiguousMut,
@@ -387,7 +387,7 @@ where
     }
 }
 
-/// &self[..]
+// &self[..]
 impl<C: for<'s> Contract<'s>, A, T> ops::Index<ops::RangeFull> for Container<C, A>
 where
     A: Contiguous<Item = T>,
@@ -400,7 +400,7 @@ where
     }
 }
 
-/// &mut self[..]
+// &mut self[..]
 impl<C: for<'s> Contract<'s>, A> ops::IndexMut<ops::RangeFull> for Container<C, A>
 where
     A: ContiguousMut,

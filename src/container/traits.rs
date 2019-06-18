@@ -27,9 +27,16 @@ unsafe impl<'a, C: ?Sized + ContainerTrait> ContainerTrait for &'a mut C {
     }
 }
 
+/// A container is `Contiguous` if the elements are layed out contiguously in memory.
+/// This is true for [`Slice`] and [`Vec`]
 pub unsafe trait Contiguous: ContainerTrait {
+    /// Returns a pointer to the first element of the container.
     fn begin(&self) -> *const Self::Item;
+
+    /// Returns a pointer to the end of the container.
     fn end(&self) -> *const Self::Item;
+
+    /// Returns the whole contiguous memory block of the container as a slice.
     fn as_slice(&self) -> &[Self::Item];
 }
 
@@ -67,17 +74,24 @@ unsafe impl<'a, C: ?Sized + Contiguous> Contiguous for &'a mut C {
     }
 }
 
+/// Since the [`Contiguous`] trait only works for immutable containers (e.g &\[T]/&Vec<T>),
+/// there also is a mutable version.
+///
+/// The mutable version makes use of the methods implemented in [`Contiguous`].
 pub unsafe trait ContiguousMut: Contiguous {
+    /// Returns a mutable pointer to the first element in the container.
     #[inline(always)]
     fn begin_mut(&mut self) -> *mut Self::Item {
         self.begin() as *mut _
     }
 
+    /// Returns a mutable pointer to the last element in the container.
     #[inline(always)]
     fn end_mut(&mut self) -> *mut Self::Item {
         self.end() as *mut _
     }
 
+    /// Returns the whole contiguous memory block of the container as a mutable slice.
     fn as_mut_slice(&mut self) -> &mut [Self::Item];
 }
 
@@ -88,8 +102,9 @@ unsafe impl<'a, C: ?Sized + ContiguousMut> ContiguousMut for &'a mut C {
     }
 }
 
+/// This trait describes how to perform unchecked indexing operations on a container.
 pub unsafe trait GetUnchecked: ContainerTrait {
-    #[inline(always)]
+    /// Returns a reference to the element at `index`.
     unsafe fn unchecked(&self, index: usize) -> &Self::Item;
 }
 
@@ -107,8 +122,14 @@ unsafe impl<'a, C: ?Sized + GetUnchecked> GetUnchecked for &'a mut C {
     }
 }
 
+/// This trait describes how to perform mutable unchecked indexing operations on a container.
+///
+/// # Unsafe
+/// This trait is marked unsafe,
+/// because it should be implemented without bounds checks,
+/// which can't be proven to be correct.
 pub unsafe trait GetUncheckedMut: GetUnchecked {
-    #[inline(always)]
+    /// Returns a mutable reference to the element at `index`.
     unsafe fn unchecked_mut(&mut self, index: usize) -> &mut Self::Item;
 }
 
@@ -119,8 +140,19 @@ unsafe impl<'a, C: ?Sized + GetUncheckedMut> GetUncheckedMut for &'a mut C {
     }
 }
 
+/// Describes how a container can be splitted.
+///
+/// # Unsafe
+/// This trait is marked unsafe,
+/// because it should be implemented without bounds checks,
+/// which can't be proven to be correct.
 pub unsafe trait SplitUnchecked: Contiguous {
+    /// The type being splitted into.
     type Split: ?Sized;
+
+    /// Devides the container into two at an index.
+    /// The first will contain all indices from `[0, index)` (excluding `index` itself) and the second one will contain all
+    /// indices from `[index, len)` (excluding the index `len` itself).
     unsafe fn split_unchecked(&self, index: usize) -> (&Self::Split, &Self::Split);
 }
 
@@ -138,7 +170,16 @@ unsafe impl<'a, C: ?Sized + SplitUnchecked> SplitUnchecked for &'a mut C {
     }
 }
 
-pub unsafe trait SplitUncheckedMut: SplitUnchecked + ContiguousMut {
+/// Describes how a container can be splitted mutable
+///
+/// # Unsafe
+/// This trait is marked unsafe,
+/// because it should be implemented without bounds checks,
+/// which can't be proven to be correct.
+pub unsafe trait SplitUncheckedMut: SplitUnchecked {
+    /// Devides the container into two at an index.
+    /// The first will contain all indices from `[0, index)` (excluding `index` itself) and the second on ewill contain all
+    /// indices from `[index, len)` (excluding the index `len` itself).
     unsafe fn split_unchecked_mut(&mut self, index: usize) -> (&mut Self::Split, &mut Self::Split);
 }
 
@@ -197,12 +238,14 @@ unsafe impl<T> GetUncheckedMut for [T] {
 unsafe impl<T> SplitUnchecked for [T] {
     type Split = [T];
 
+    #[inline(always)]
     unsafe fn split_unchecked(&self, index: usize) -> (&Self::Split, &Self::Split) {
         (self.get_unchecked(..index), self.get_unchecked(index..))
     }
 }
 
 unsafe impl<T> SplitUncheckedMut for [T] {
+    #[inline(always)]
     unsafe fn split_unchecked_mut(&mut self, index: usize) -> (&mut Self::Split, &mut Self::Split) {
         let len = self.len();
 
@@ -214,6 +257,7 @@ unsafe impl<T> SplitUncheckedMut for [T] {
         )
     }
 }
+
 unsafe impl<T> ContainerTrait for Vec<T> {
     type Item = T;
 
