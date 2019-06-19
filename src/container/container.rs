@@ -7,7 +7,7 @@ use crate::core::{
     index::Index,
     proof::NonEmpty,
     range::Range,
-    seal::{Contract, Seal},
+    seal::{Contract, Seal, Signed},
 };
 
 /// A container is a generic container over type A (array).
@@ -32,6 +32,15 @@ impl<C: for<'s> Contract<'s>, A: Clone> Clone for Container<C, A> {
             seal: Seal::new(),
             container: self.container.clone(),
         }
+    }
+}
+
+impl <'id, A, T> Container<Signed<'id>, A>
+where
+    A: ContainerTrait<Item = T>
+{
+    pub fn new_unique(container: A) -> Container<impl for <'s> Contract<'s>, A> {
+        Container::<Signed, _>::new(container)
     }
 }
 
@@ -407,5 +416,28 @@ where
 {
     fn index_mut(&mut self, _: ops::RangeFull) -> &mut Self::Output {
         self.container.as_mut_slice()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::*;
+
+    #[test]
+    fn test_container_without_region() {
+        let mut v = vec![1, 2, 3, 4, 5, 6, 7];
+        let c = Container::new_unique(v.as_mut_slice());
+
+        if let Some(r) = c.range().nonempty() {
+            let mid = r.upper_middle();
+            let (lhs, rhs) = c.split_at(mid);
+
+            let lhsidx = lhs.range().nonempty().and_then(|r| r.contains(2)).unwrap();
+            let rhsidx = rhs.range().first();
+
+            let slice = &lhs[..lhsidx];
+            assert_eq!(slice, &[1, 2]);
+        }
     }
 }
