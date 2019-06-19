@@ -107,7 +107,7 @@ impl<C: for<'s> Contract<'s>, P> Range<C, P> {
     /// Returns a new NonEmpty range.
     /// Marked unsafe, because it just assumes this is called on
     /// a range that isn't empty.
-    /// 
+    ///
     /// For the safe variant, see [`Range::nonempty`].
     #[inline]
     pub unsafe fn assume_nonempty(&self) -> Range<C, NonEmpty> {
