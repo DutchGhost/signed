@@ -29,17 +29,14 @@ mod tests {
 
                 let (lhs, rhs) = s.split_at_mut(mid);
 
-                assert_eq!(lhs[lhs.range()], [1, 2, 3]);
-                assert_eq!(rhs[rhs.range()], [4, 5, 6]);
+                region(lhs, |lhsc| {
+                    assert_eq!(lhsc[lhsc.range()], [1, 2, 3]);
+                });
 
-                let middle = lhs.range().nonempty().unwrap().upper_middle();
-                let (llhs, lrhs) = lhs.split_at(middle);
-
-                assert_eq!(llhs[llhs.range()], [1]);
-                assert_eq!(lrhs[lrhs.range()], [2, 3]);
+                region(rhs, |rhsc| {
+                    assert_eq!(rhsc[rhsc.range()], [4, 5, 6]);
+                })
             }
-
-            assert!(triggered);
         })
     }
 
@@ -84,13 +81,13 @@ mod tests {
 
             assert_eq!(first, &1);
             assert_eq!(rest[..], []);
-            assert!(rest.range().nonempty().is_none());
+            assert!(rest.is_empty());
 
             let (first, rest) = s.split_first_mut().unwrap();
 
             assert_eq!(first, &mut 1);
             assert_eq!(rest[..], []);
-            assert!(rest.range().nonempty().is_none());
+            assert!(rest.is_empty());
         })
     }
 
@@ -112,7 +109,7 @@ mod tests {
             if let Some(r) = s.range().nonempty() {
                 let mid = r.upper_middle();
 
-                let (lhs, rhs) = s.split_at_mut(mid);
+                let (lhs, rhs) = s.split_at(mid);
             }
         })
     }

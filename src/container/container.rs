@@ -153,23 +153,18 @@ where
     A: SplitUnchecked<Item = T>,
 {
     #[inline(always)]
-    pub fn split_first(
-        &self,
-    ) -> Option<(
-        &T,
-        Container<impl for<'s> Contract<'s>, &<A as SplitUnchecked>::Split>,
-    )>
+    pub fn split_first(&self) -> Option<(&T, &<A as SplitUnchecked>::Split)>
     where
         <A as SplitUnchecked>::Split: GetUnchecked<Item = T>,
     {
-        // The bound on <C as SplitUnchecked>::Split allows the `unchecked(0)` call.
+        // The bound on <A as SplitUnchecked>::Split allows the `unchecked(0)` call.
         unsafe {
             if !self.is_empty() {
                 let split = self.split_at(Index::new(1));
 
                 let (lhs, rhs) = split;
 
-                Some((lhs.container.unchecked(0), rhs))
+                Some((lhs.unchecked(0), rhs))
             } else {
                 None
             }
@@ -183,24 +178,8 @@ where
     pub fn split_at(
         &self,
         index: Index<C>,
-    ) -> (
-        Container<impl for<'s> Contract<'s>, &<A as SplitUnchecked>::Split>,
-        Container<impl for<'s> Contract<'s>, &<A as SplitUnchecked>::Split>,
-    ) {
-        unsafe {
-            let (lhs, rhs) = self.container.split_unchecked(index.integer());
-
-            (
-                Container {
-                    seal: <C as Contract<'_>>::SEALED,
-                    container: lhs,
-                },
-                Container {
-                    seal: <C as Contract<'_>>::SEALED,
-                    container: rhs,
-                },
-            )
-        }
+    ) -> (&<A as SplitUnchecked>::Split, &<A as SplitUnchecked>::Split) {
+        unsafe { self.container.split_unchecked(index.integer()) }
     }
 }
 
@@ -209,23 +188,18 @@ where
     A: SplitUncheckedMut<Item = T>,
 {
     #[inline(always)]
-    pub fn split_first_mut(
-        &mut self,
-    ) -> Option<(
-        &mut T,
-        Container<impl for<'s> Contract<'s>, &mut <A as SplitUnchecked>::Split>,
-    )>
+    pub fn split_first_mut(&mut self) -> Option<(&mut T, &mut <A as SplitUnchecked>::Split)>
     where
         <A as SplitUnchecked>::Split: GetUncheckedMut<Item = T>,
     {
-        // The bound on <C as SplitUnchecked>::Split allows the `unchecked_mut(0)` call.
+        // The bound on <A as SplitUnchecked>::Split allows the `unchecked_mut(0)` call.
         unsafe {
             if !self.is_empty() {
                 let split = self.split_at_mut(Index::new(1));
 
                 let (lhs, rhs) = split;
 
-                Some((lhs.container.unchecked_mut(0), rhs))
+                Some((lhs.unchecked_mut(0), rhs))
             } else {
                 None
             }
@@ -239,23 +213,10 @@ where
         &mut self,
         index: Index<C>,
     ) -> (
-        Container<impl for<'s> Contract<'s>, &mut <A as SplitUnchecked>::Split>,
-        Container<impl for<'s> Contract<'s>, &mut <A as SplitUnchecked>::Split>,
+        &mut <A as SplitUnchecked>::Split,
+        &mut <A as SplitUnchecked>::Split,
     ) {
-        unsafe {
-            let (lhs, rhs) = self.container.split_unchecked_mut(index.integer());
-
-            (
-                Container {
-                    seal: <C as Contract<'_>>::SEALED,
-                    container: lhs,
-                },
-                Container {
-                    seal: <C as Contract<'_>>::SEALED,
-                    container: rhs,
-                },
-            )
-        }
+        unsafe { self.container.split_unchecked_mut(index.integer()) }
     }
 }
 
